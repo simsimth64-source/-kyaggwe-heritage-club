@@ -6,7 +6,7 @@ from datetime import datetime
 st.set_page_config(page_title="Rotary Club of Kyaggwe Heritage", page_icon="⚙️", layout="wide")
 
 def get_logo():
-    for p in ["logo_exact_final.png.jpg","logo_exact_final.png","logo.png","logo.jpg"]:
+    for p in ["logo_exact_final.png.jpg","logo_exact_final.png","logo.png","logo.jpg","rotary_logo.png"]:
         if os.path.exists(p):
             return p
     return None
@@ -49,6 +49,7 @@ if not st.session_state.logged_in:
     with c2:
         if logo: st.image(logo, width=300)
         st.title("ROTARY CLUB OF KYAGGWE HERITAGE")
+        st.subheader("Club ID: 228098 | District 9213 | Unite for Good")
         st.divider()
         officer = st.selectbox("Select Officer", list(PASSWORDS.keys()))
         pwd = st.text_input("Password", type="password")
@@ -64,7 +65,8 @@ if not st.session_state.logged_in:
 with st.sidebar:
     if logo: st.image(logo, width=200)
     st.title("KYAGGWE HERITAGE")
-    st.metric("Members", len(st.session_state.members))
+    st.caption("Logged in: " + str(st.session_state.officer))
+    st.metric("Total Members", len(st.session_state.members))
     st.divider()
     menu = st.radio("Navigation", ["Dashboard","Members ADD/REMOVE","Smart Attendance","Finances","Receipts","Get APK"])
     if st.button("Logout"):
@@ -73,17 +75,22 @@ with st.sidebar:
 
 if menu == "Dashboard":
     st.title("Club Dashboard")
-    c1,c2,c3 = st.columns(3)
+    c1,c2,c3,c4 = st.columns(4)
     c1.metric("Total Members", len(st.session_state.members))
-    c2.metric("Board", "10/18")
-    c3.metric("Charter", "June 2026")
-    st.success(f"Welcome {st.session_state.officer} - {len(st.session_state.members)} members loaded")
+    c2.metric("Active", len(st.session_state.members))
+    c3.metric("Board Filled", "10/18")
+    c4.metric("Charter", "June 2026")
+    st.divider()
+    st.info("Club ID 228098 | P.O Box 954 Mukono | District 9213 | Theme: Unite for Good")
+    st.write("President: Khissa Pamela | Secretary: Mubeezi Geoffrey | Treasurer: Kasirye Simon Peter")
 
 elif menu == "Members ADD/REMOVE":
-    st.title("Members - Add/Remove WITHOUT CODE")
+    st.title("Members - Add/Remove Without Code")
+    st.success("Total: " + str(len(st.session_state.members)) + " members")
     df = pd.DataFrame(st.session_state.members)
     st.dataframe(df, use_container_width=True, height=400)
-    
+    st.download_button("Download Backup CSV", df.to_csv(index=False), "members.csv", "text/csv")
+
     st.divider()
     st.subheader("Add New Member")
     with st.form("add"):
@@ -91,29 +98,118 @@ elif menu == "Members ADD/REMOVE":
         ln = st.text_input("Last Name")
         ph = st.text_input("Phone")
         em = st.text_input("Email")
-        if st.form_submit_button("Add Member"):
+        mno = st.text_input("Member No")
+        if st.form_submit_button("Add Member", type="primary"):
             if fn and ln:
-                new_m = {"MemberNo":"NEW","FirstName":fn,"LastName":ln,"FullName":fn+" "+ln,"Phone":ph,"Email":em}
+                full = fn + " " + ln
+                new_m = {"MemberNo":mno, "FirstName":fn, "LastName":ln, "FullName":full, "Phone":ph, "Email":em}
                 st.session_state.members.append(new_m)
-                st.success("Added!")
+                st.success("Added " + full)
                 st.rerun()
+            else:
+                st.error("Need First and Last name")
 
     st.divider()
     st.subheader("Remove Member")
     names = []
     for m in st.session_state.members:
         names.append(m["FullName"])
-    sel = st.selectbox("Select to Remove", names)
-    if st.button("Remove"):
-        idx = 0
+    sel = st.selectbox("Select Member to Remove", names)
+    if st.button("Remove Selected"):
         for i, m in enumerate(st.session_state.members):
             if m["FullName"] == sel:
-                idx = i
+                st.session_state.members.pop(i)
                 break
-        st.session_state.members.pop(idx)
-        st.warning("Removed "+sel)
+        st.warning("Removed " + sel)
         st.rerun()
 
-else:
-    st.title(menu)
-    st.info("This section works - use Members page to test add/remove")
+elif menu == "Smart Attendance":
+    st.title("Smart Attendance")
+    st.write("Upload Excel list with names - system auto-matches your members")
+    uploaded = st.file_uploader("Upload Attendance Excel or CSV", type=["xlsx","csv"])
+    if uploaded is not None:
+        if uploaded.name.endswith(".csv"):
+            att_df = pd.read_csv(uploaded)
+        else:
+            att_df = pd.read_excel(uploaded)
+        st.write("File preview:")
+        st.dataframe(att_df.head(), use_container_width=True)
+
+        present = []
+        for idx, row in att_df.iterrows():
+            name_str = str(row.iloc[0]).lower()
+            for mem in st.session_state.members:
+                first = mem["FirstName"].lower()
+                last = mem["LastName"].lower()
+                if first in name_str or last in name_str:
+                    present.append(mem["FullName"])
+                    break
+        present_unique = list(set(present))
+        st.divider()
+        c1,c2 = st.columns(2)
+        c1.metric("Present", str(len(present_unique)) + " / " + str(len(st.session_state.members)))
+        c2.metric("Absent", len(st.session_state.members) - len(present_unique))
+        st.write("Present members:")
+        st.write(present_unique)
+
+        all_names = []
+        for m in st.session_state.members:
+            all_names.append(m["FullName"])
+        absent = []
+        for n in all_names:
+            if n not in present_unique:
+                absent.append(n)
+        st.write("Absent members:")
+        st.write(absent)
+
+        report_df = pd.DataFrame({"FullName": all_names})
+        status = []
+        for n in all_names:
+            if n in present_unique:
+                status.append("Present")
+            else:
+                status.append("Absent")
+        report_df["Status"] = status
+        st.download_button("Download Attendance Report", report_df.to_csv(index=False), "attendance_report.csv", "text/csv")
+
+elif menu == "Finances":
+    st.title("Finances - Dues Tracking")
+    base_df = pd.DataFrame(st.session_state.members)
+    cols = []
+    for m in st.session_state.members:
+        cols.append({"FullName": m["FullName"], "Phone": m["Phone"], "Dues Paid": 0, "Balance": 50000})
+    fin_df = pd.DataFrame(cols)
+    st.data_editor(fin_df, use_container_width=True, height=500)
+    st.info("Edit Dues directly in table")
+
+elif menu == "Receipts":
+    st.title("Receipt Generator")
+    names = []
+    for m in st.session_state.members:
+        names.append(m["FullName"])
+    member = st.selectbox("Select Member", names)
+    amount = st.number_input("Amount UGX", value=50000)
+    purpose = st.selectbox("Purpose", ["Membership Dues","Donation","Fellowship Fee","Other"])
+    if st.button("Generate Receipt", type="primary"):
+        receipt_no = "RCKH-" + datetime.now().strftime("%Y%m%d%H%M")
+        st.success("Receipt Generated!")
+        st.code(receipt_no + " | Member: " + member + " | Amount: UGX " + str(amount) + " | Purpose: " + purpose + " | By: " + str(st.session_state.officer))
+        if logo:
+            st.image(logo, width=150)
+
+elif menu == "Get APK":
+    st.title("Get Android APK")
+    st.success("Your app is live at: https://fmwfp.streamlit.app")
+    st.markdown("""
+    **OPTION 1 - Install as App (30 seconds, like APK):**
+    1. Open Chrome: fmwfp.streamlit.app
+    2. Tap 3 dots top right -> Add to Home screen
+    3. Tap Install - Rotary icon appears on phone!
+
+    **OPTION 2 - Real APK file:**
+    1. Go to appsgeyser.com
+    2. Create App -> Website -> Paste https://fmwfp.streamlit.app
+    3. Name: Kyaggwe Heritage Club - Upload logo
+    4. Download APK and share on WhatsApp
+    """)
+    st.link_button("Open Live App", "https://fmwfp.streamlit.app", use_container_width=True)
