@@ -119,4 +119,7 @@ elif menu == "👥 Members - ADD/REMOVE":
     
     st.divider()
     st.subheader("3. ➖ Remove Member")
-    to_remove = st.selectbox("Select Member to Remove", 
+        options_list = []
+    for m in st.session_state.members:
+        options_list.append(m["FullName"])
+    to_remove = st.selectbox("Select Member to Remove", options_list)
