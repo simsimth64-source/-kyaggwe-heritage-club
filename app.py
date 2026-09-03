@@ -25,7 +25,7 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.image("logo_exact_final.png", width=300)
+    st.image("logo_exact_final.png.jpg", width=300)
     st.title("ROTARY CLUB OF KYAGGWE HERITAGE")
     st.write("Club ID: 228098 | District 9213 | Charter June 2026 | Theme: Unite for Good")
     st.divider()
@@ -41,7 +41,7 @@ if not st.session_state.logged_in:
             st.error("Wrong password")
     st.stop()
 
-st.sidebar.image("logo_exact_final.png", width=200)
+st.sidebar.image("logo_exact_final.png.jpg", width=200)
 st.sidebar.write(f"**{st.session_state.user['name']}**")
 menu = st.sidebar.radio("Menu", ["Dashboard","Members (18)","Board 10+8 Open","Attendance","Dues","Projects","Photos & Events Upload","Documents Upload"])
 
