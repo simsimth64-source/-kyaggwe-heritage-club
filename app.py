@@ -3,7 +3,7 @@ import pandas as pd
 import os
 from datetime import datetime
 
-st.set_page_config(page_title="Kyaggwe Heritage Pro", page_icon="⚙️", layout="wide")
+st.set_page_config(page_title="Kyaggwe Heritage", page_icon="⚙️", layout="wide")
 
 def get_logo():
     for p in ["logo_exact_final.png.jpg","logo_exact_final.png","logo.png","logo.jpg","rotary_logo.png"]:
@@ -16,21 +16,18 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
 html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
-.stApp { background: linear-gradient(180deg, #f7f9ff 0%, #eef2ff 100%); }
-.pro-header { background: linear-gradient(135deg, #0A2A5E 0%, #1746A2 50%, #0A2A5E 100%); padding: 25px 30px; border-radius: 20px; color: white; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(10,42,94,0.3); }
-.pro-card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border-left: 5px solid #FDB913; margin-bottom: 15px; }
-.pro-stat { background: white; padding: 20px; border-radius: 16px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 4px solid #FDB913; }
-.announcement-card { background: white; border-radius: 14px; padding: 18px; border-left: 5px solid #0A2A5E; box-shadow: 0 2px 12px rgba(0,0,0,0.05); margin-bottom: 12px; }
-.admin-badge { background: #FDB913; color: #0A2A5E; padding: 3px 10px; border-radius: 20px; font-weight: 700; font-size: 12px; }
+.stApp { background: #f0f4ff; }
+.welcome-banner { background: linear-gradient(135deg, #0A2A5E 0%, #1746A2 60%, #FDB913 100%); padding: 25px; border-radius: 18px; text-align: center; color: white; margin-bottom: 15px; }
+.pro-header { background: linear-gradient(135deg, #0A2A5E 0%, #1746A2 100%); padding: 18px 20px; border-radius: 15px; color: white; margin-bottom: 15px; }
+.pro-card { background: white; padding: 18px; border-radius: 14px; box-shadow: 0 3px 15px rgba(0,0,0,0.06); border-left: 5px solid #FDB913; margin-bottom: 12px; }
+.icon-card { background: white; padding: 18px; border-radius: 16px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 4px solid #FDB913; height: 130px; }
 </style>
 """, unsafe_allow_html=True)
 
-# ADMIN - ONLY THESE 3 CAN EDIT/UPLOAD - UPDATED WITH YOUR NEW BOARD
 ADMIN_PASSWORDS = {
     "Khissa Pamela - President": "President123",
     "Francis Ssemugonda - Secretary": "Secretary123",
     "Ntulume Wilson Ssekulwana - Treasurer": "Treasurer123",
-    # Keep old for transition
     "Mubeezi Geoffrey - Secretary": "Secretary123",
     "Kasirye Simon Peter - Treasurer": "Treasurer123"
 }
@@ -56,8 +53,6 @@ DEFAULT_MEMBERS = [
     {"MemberNo":"12664757","FirstName":"Ntulume","LastName":"Ssekulwana","FullName":"Ntulume Wilson Ssekulwana","Phone":"+256 752525386","Email":"wilsonntulume97@gmail.com","Role":"Club Treasurer"},
     {"MemberNo":"12664735","FirstName":"Francis","LastName":"Ssemugonda","FullName":"Francis Ssemugonda","Phone":"+256 762736379","Email":"francisssemugonda@gmail.com","Role":"Club Secretary"},
 ]
-
-# YOUR EXACT BOARD FROM IMAGE
 DEFAULT_BOARD = [
     {"Position":"Club Executive Secretary/Director","Name":"Muzige Abubaker","Phone":"+256 757447213","Email":"muzigeabubakar@gmail.com"},
     {"Position":"Club Foundation Chair","Name":"Moses Kizito","Phone":"+256 702330143","Email":"kizito.moses2@gmail.com"},
@@ -76,29 +71,24 @@ if "board" not in st.session_state: st.session_state.board = DEFAULT_BOARD.copy(
 if "records" not in st.session_state: st.session_state.records = []
 if "reports" not in st.session_state: st.session_state.reports = []
 if "gallery" not in st.session_state: st.session_state.gallery = []
-if "announcements" not in st.session_state: st.session_state.announcements = [{"title":"Board Updated - Welcome New Leadership!","msg":"Your real Board Officers from My Rotary are now in app. Admins can add more positions anytime from Board Officers page, and member sees it reflected instantly in his account!","date":"2026-05-13","by":"President"}]
+if "announcements" not in st.session_state: st.session_state.announcements = [{"title":"Welcome to Kyaggwe Heritage!","msg":"App is live with logo and welcome screen!","date":"2026-05-13","by":"President"}]
 if "member_passwords" not in st.session_state: st.session_state.member_passwords = {}
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if "user_role" not in st.session_state: st.session_state.user_role = "Member"
 
-def show_header(t,s): st.markdown('<div class="pro-header"><h2>' + t + '</h2><p>' + s + '</p></div>', unsafe_allow_html=True)
-def is_admin(): return any(a in st.session_state.user_role for a in ADMINS)
-def sync_member_role(board_name, board_position):
-    # When board assigned, update that member's Role so it reflects in his account
-    for m in st.session_state.members:
-        if board_name.lower() in m["FullName"].lower() or m["FullName"].lower() in board_name.lower():
-            m["Role"] = board_position
-            break
+def show_header(icon, title, subtitle):
+    st.markdown('<div class="pro-header"><h2>' + icon + ' ' + title + '</h2><p>' + subtitle + '</p></div>', unsafe_allow_html=True)
+def is_admin():
+    return any(a in st.session_state.user_role for a in ADMINS)
 
-# ---------- LOGIN WITH SELF-RESET ----------
+# ---------- LOGIN - SIMPLE NO STOP LOOP ----------
 if not st.session_state.logged_in:
-    show_header("ROTARY CLUB OF KYAGGWE HERITAGE", "Club ID 228098 | District 9213 | Board Officers Synced from My Rotary")
-    tab1, tab2, tab3, tab4 = st.tabs(["🔐 Admin Login", "👥 Member Login", "🆕 Register", "🔑 Forgot/Reset Password"])
-
+    st.markdown('<div class="welcome-banner"><div style="font-size:60px;">⚙️</div><h1>Kyaggwe Heritage</h1><h3>Welcome to Kyaggwe Heritage</h3><p>Rotary Club | District 9213 | Service • Fellowship • Community</p><p>Club ID: 228098</p></div>', unsafe_allow_html=True)
+    if logo_path:
+        st.image(logo_path, width=180)
+    tab1, tab2, tab3, tab4 = st.tabs(["🔐 Admin", "👥 Member", "🆕 Register", "🔑 Reset"])
     with tab1:
-        if logo_path: st.image(logo_path, width=250)
-        st.markdown('<div class="pro-card"><h3>Admin - Only President/Secretary/Treasurer Can Upload/Edit</h3><span class="admin-badge">ADMIN ONLY</span></div>', unsafe_allow_html=True)
-        officer = st.selectbox("Select Admin", list(ADMIN_PASSWORDS.keys()))
+        officer = st.selectbox("Admin", list(ADMIN_PASSWORDS.keys()))
         pwd = st.text_input("Password", type="password", key="apwd")
         if st.button("Login as Admin", type="primary", use_container_width=True):
             if ADMIN_PASSWORDS.get(officer) == pwd:
@@ -108,10 +98,8 @@ if not st.session_state.logged_in:
                 st.session_state.officer = officer
                 st.rerun()
             else: st.error("Wrong!")
-
     with tab2:
-        st.markdown('<div class="pro-card"><h3>Member Login - View Only</h3><p>Your account shows your Board Position automatically when admin assigns you!</p></div>', unsafe_allow_html=True)
-        phone_login = st.text_input("Phone Number", placeholder="+256 7...")
+        phone_login = st.text_input("Phone", placeholder="+256 7...")
         pass_login = st.text_input("Password", type="password", key="mpwd")
         if st.button("Login as Member", type="primary", use_container_width=True):
             found = next((m for m in st.session_state.members if m["Phone"] == phone_login), None)
@@ -121,226 +109,212 @@ if not st.session_state.logged_in:
                     st.session_state.logged_in = True
                     st.session_state.current_user = found["FullName"]
                     st.session_state.user_role = found.get("Role","Member")
-                    st.session_state.officer = found["FullName"] + " - " + found.get("Role","Member")
+                    st.session_state.officer = found["FullName"]
                     st.rerun()
-                else: st.error("Wrong password! Use Forgot tab to reset yourself - no admin needed.")
-            else: st.error("Phone not found! Register first.")
-
+                else: st.error("Wrong password! Use Reset")
+            else: st.error("Phone not found!")
     with tab3:
-        st.markdown('<div class="pro-card"><h3>New Member Self-Registration</h3></div>', unsafe_allow_html=True)
         with st.form("reg"):
-            fn = st.text_input("First Name*"); ln = st.text_input("Last Name*"); phone = st.text_input("Phone*"); email = st.text_input("Email"); new_pass = st.text_input("Create Password*", type="password"); confirm_pass = st.text_input("Confirm*", type="password")
-            if st.form_submit_button("🚀 Register & Join", type="primary", use_container_width=True):
+            fn = st.text_input("First Name*"); ln = st.text_input("Last Name*"); phone = st.text_input("Phone*"); email = st.text_input("Email"); new_pass = st.text_input("Password*", type="password"); confirm_pass = st.text_input("Confirm*", type="password")
+            if st.form_submit_button("Register", type="primary", use_container_width=True):
                 if fn and ln and phone and new_pass and new_pass == confirm_pass:
                     if not any(m["Phone"] == phone for m in st.session_state.members):
                         full = fn + " " + ln
                         st.session_state.members.append({"MemberNo":"NEW-"+datetime.now().strftime("%Y%m%d%H%M"),"FirstName":fn,"LastName":ln,"FullName":full,"Phone":phone,"Email":email,"Role":"Member"})
                         st.session_state.member_passwords[phone] = new_pass
-                        st.success("Welcome " + full + "! Now login via Member Login")
-                    else: st.warning("Phone already exists!")
+                        st.success("Welcome " + full + "! Now login")
+                    else: st.warning("Phone exists!")
                 else: st.error("Check fields!")
-
     with tab4:
-        st.markdown('<div class="pro-card"><h3>🔑 Self-Reset - No Calling Admin!</h3></div>', unsafe_allow_html=True)
         with st.form("reset"):
-            reset_phone = st.text_input("Registered Phone*"); verify_name = st.text_input("First Name to Verify*"); new_pass2 = st.text_input("New Password*", type="password"); confirm2 = st.text_input("Confirm*", type="password")
-            if st.form_submit_button("🔄 Reset My Password", type="primary", use_container_width=True):
+            reset_phone = st.text_input("Registered Phone*"); verify_name = st.text_input("First Name*"); new_pass2 = st.text_input("New Password*", type="password"); confirm2 = st.text_input("Confirm*", type="password")
+            if st.form_submit_button("Reset Password", type="primary", use_container_width=True):
                 found = next((m for m in st.session_state.members if m["Phone"] == reset_phone and m["FirstName"].lower() == verify_name.lower()), None)
                 if found and new_pass2 and new_pass2 == confirm2:
                     st.session_state.member_passwords[reset_phone] = new_pass2
-                    st.success("Reset success for " + found["FullName"] + "! Login with new password. No admin call needed!")
+                    st.success("Reset success! Login with new password")
                 else: st.error("Verification failed!")
     st.stop()
 
 # ---------- SIDEBAR ----------
 with st.sidebar:
-    if logo_path: st.image(logo_path, width=180)
-    st.markdown("### ⚙️ KYAGGWE HERITAGE PRO")
-    st.write("User: " + str(st.session_state.current_user))
-    st.markdown("Role: <b>" + str(st.session_state.user_role) + "</b> " + ("<span class='admin-badge'>ADMIN - CAN EDIT/UPLOAD</span>" if is_admin() else "<span style='background:#ddd;padding:3px 10px;border-radius:20px;font-size:12px;'>VIEW ONLY</span>"), unsafe_allow_html=True)
-    st.metric("Members", len(st.session_state.members))
+    if logo_path: st.image(logo_path, width=160)
+    st.markdown("### ⚙️ KYAGGWE HERITAGE")
+    st.write("👤 " + str(st.session_state.current_user))
+    st.caption("🏷️ " + str(st.session_state.user_role))
+    st.metric("👥 Members", len(st.session_state.members))
     st.divider()
-    menu = st.radio("📱 NAVIGATION", ["🏠 Dashboard Pro","👥 Members","🏛️ Board Officers","✅ Attendance","💰 Finances","📁 Club Records","📊 Reports","📸 Gallery & Albums","📢 Club Hub","🧾 Receipts","📲 Get APK"])
-    if st.button("Logout"):
-        st.session_state.logged_in = False; st.session_state.user_role = "Member"; st.rerun()
-    if not is_admin():
-        st.error("🔒 View Only")
-    else:
-        st.success("✅ Admin: Can Upload/Edit")
+    menu = st.radio("📱 MENU", ["🏠 Dashboard","👥 Members","🏛️ Board Officers","✅ Attendance","💰 Finances","📁 Club Records","📊 Reports","📸 Gallery","📢 Club Hub","🧾 Receipts","📲 Get APK with Logo"])
+    if st.button("🚪 Logout"):
+        st.session_state.logged_in = False
+        st.rerun()
 
 # ---------- PAGES ----------
-if menu == "🏠 Dashboard Pro":
-    show_header("Welcome, " + str(st.session_state.current_user) + "!", "Role: " + str(st.session_state.user_role) + " | " + ("ADMIN - Full Access" if is_admin() else "Member - View Only"))
+if menu == "🏠 Dashboard":
+    st.markdown('<div class="welcome-banner"><h2>Welcome to Kyaggwe Heritage, ' + str(st.session_state.current_user).split(" -")[0] + '!</h2><p>Role: ' + str(st.session_state.user_role) + ' | ' + datetime.now().strftime("%b %d, %Y") + '</p></div>', unsafe_allow_html=True)
     c1,c2,c3,c4 = st.columns(4)
-    with c1: st.markdown('<div class="pro-stat"><h1>👥</h1><h2>' + str(len(st.session_state.members)) + '</h2><p>Members</p></div>', unsafe_allow_html=True)
-    with c2: st.markdown('<div class="pro-stat"><h1>🏛️</h1><h2>' + str(len(st.session_state.board)) + '</h2><p>Board Officers</p></div>', unsafe_allow_html=True)
-    with c3: st.markdown('<div class="pro-stat"><h1>📸</h1><h2>' + str(len(st.session_state.gallery)) + '</h2><p>Photos</p></div>', unsafe_allow_html=True)
-    with c4: st.markdown('<div class="pro-stat"><h1>📁</h1><h2>' + str(len(st.session_state.records)) + '</h2><p>Records</p></div>', unsafe_allow_html=True)
+    with c1: st.markdown('<div class="icon-card"><div style="font-size:35px;">👥</div><h3>' + str(len(st.session_state.members)) + '</h3><p>Members</p></div>', unsafe_allow_html=True)
+    with c2: st.markdown('<div class="icon-card"><div style="font-size:35px;">🏛️</div><h3>' + str(len(st.session_state.board)) + '</h3><p>Board</p></div>', unsafe_allow_html=True)
+    with c3: st.markdown('<div class="icon-card"><div style="font-size:35px;">📸</div><h3>' + str(len(st.session_state.gallery)) + '</h3><p>Photos</p></div>', unsafe_allow_html=True)
+    with c4: st.markdown('<div class="icon-card"><div style="font-size:35px;">📁</div><h3>' + str(len(st.session_state.records)) + '</h3><p>Records</p></div>', unsafe_allow_html=True)
     st.divider()
-    st.subheader("🏛️ Current Board")
+    st.subheader("🏛️ Board Officers")
     cols = st.columns(2)
     for i,b in enumerate(st.session_state.board):
         with cols[i%2]:
-            st.markdown('<div class="pro-card"><b>' + b["Position"] + '</b><br>👤 ' + b["Name"] + '<br><small>📞 ' + b["Phone"] + ' | ✉️ ' + b["Email"] + '</small></div>', unsafe_allow_html=True)
-    st.divider()
+            st.markdown('<div class="pro-card"><b>🏛️ ' + b["Position"] + '</b><br>👤 ' + b["Name"] + '</div>', unsafe_allow_html=True)
     st.subheader("📢 Announcements")
     for ann in reversed(st.session_state.announcements):
-        st.markdown('<div class="announcement-card"><b>📌 ' + ann["title"] + '</b><br>' + ann["msg"] + '<br><small>📅 ' + ann["date"] + ' | By ' + ann["by"] + '</small></div>', unsafe_allow_html=True)
+        st.markdown('<div class="pro-card"><b>📌 ' + ann["title"] + '</b><br>' + ann["msg"] + '<br><small>' + ann["date"] + ' | By ' + ann["by"] + '</small></div>', unsafe_allow_html=True)
 
 elif menu == "👥 Members":
-    show_header("Members Directory", "Total: " + str(len(st.session_state.members)) + " | Board Position shows in account automatically")
+    show_header("👥","Members Directory","Total: " + str(len(st.session_state.members)))
     st.dataframe(pd.DataFrame(st.session_state.members), use_container_width=True, height=350)
+    st.download_button("Download CSV", pd.DataFrame(st.session_state.members).to_csv(index=False), "members.csv", "text/csv", use_container_width=True)
     if is_admin():
-        c1,c2 = st.columns(2)
-        with c1:
+        with st.form("add_mem"):
             st.subheader("➕ Add Member (Admin Only)")
-            with st.form("add_mem"):
-                fn = st.text_input("First Name"); ln = st.text_input("Last Name"); ph = st.text_input("Phone"); em = st.text_input("Email"); role = st.selectbox("Role", ["Member","Club President","Club Secretary","Club Treasurer","Club Executive Secretary/Director","Club Foundation Chair","Club Learning Facilitator","Club Membership Chair","Club Public Image Chair","Club Service Projects Chair","Club Young Leaders Contact","Sergeant at Arms","Other Board Position"])
-                if st.form_submit_button("Add Member", type="primary"):
-                    if fn and ln and ph:
-                        st.session_state.members.append({"MemberNo":"NEW","FirstName":fn,"LastName":ln,"FullName":fn+" "+ln,"Phone":ph,"Email":em,"Role":role})
-                        if ph not in st.session_state.member_passwords: st.session_state.member_passwords[ph] = "member123"
-                        st.success("Added " + fn + " " + ln + " as " + role); st.rerun()
-        with c2:
-            st.subheader("➖ Remove (Admin Only)")
-            names = [m["FullName"] for m in st.session_state.members]
-            sel = st.selectbox("Select", names)
-            if st.button("Remove", type="primary"):
-                for i,m in enumerate(st.session_state.members):
-                    if m["FullName"] == sel:
-                        st.session_state.members.pop(i); break
-                st.warning("Removed " + sel); st.rerun()
+            fn = st.text_input("First Name"); ln = st.text_input("Last Name"); ph = st.text_input("Phone"); em = st.text_input("Email"); role = st.selectbox("Role", ["Member","Club President","Club Secretary","Club Treasurer","Club Executive Secretary/Director","Club Foundation Chair","Club Learning Facilitator","Club Membership Chair","Club Public Image Chair","Club Service Projects Chair","Club Young Leaders Contact","Other"])
+            if st.form_submit_button("Add Member", type="primary"):
+                if fn and ln and ph:
+                    st.session_state.members.append({"MemberNo":"NEW","FirstName":fn,"LastName":ln,"FullName":fn+" "+ln,"Phone":ph,"Email":em,"Role":role})
+                    if ph not in st.session_state.member_passwords: st.session_state.member_passwords[ph] = "member123"
+                    st.success("Added"); st.rerun()
 
 elif menu == "🏛️ Board Officers":
-    show_header("Board Officers - Add More Positions Anytime!", "When you assign member, it reflects in his account instantly")
+    show_header("🏛️","Board Officers","Add more anytime - Reflects in member account")
     st.dataframe(pd.DataFrame(st.session_state.board), use_container_width=True, height=400)
     if is_admin():
         st.divider()
-        st.subheader("✏️ Edit Existing Officer")
-        with st.form("edit_board"):
-            positions = [b["Position"] for b in st.session_state.board]
-            sel_pos = st.selectbox("Select Position to Edit", positions)
-            cur = next((b for b in st.session_state.board if b["Position"] == sel_pos), None)
-            new_name = st.text_input("Officer Name", value=cur["Name"] if cur else "")
-            new_phone = st.text_input("Phone", value=cur["Phone"] if cur else "")
-            new_email = st.text_input("Email", value=cur["Email"] if cur else "")
-            if st.form_submit_button("💾 Save Change & Update Member Account", type="primary"):
-                for b in st.session_state.board:
-                    if b["Position"] == sel_pos:
-                        b["Name"]=new_name; b["Phone"]=new_phone; b["Email"]=new_email; break
-                sync_member_role(new_name, sel_pos)
-                st.success("Updated " + sel_pos + " = " + new_name + " - Member account now shows new position!")
-                st.rerun()
-
-        st.divider()
-        st.subheader("➕ Add NEW Board Position (Provision for Future)")
-        st.info("Soon you will add more officers - Use this form! Example: Sergeant at Arms, Vocational Service Chair, etc")
+        st.subheader("➕ Add NEW Board Position")
         with st.form("add_board"):
-            pos = st.text_input("New Position Title* e.g. Sergeant at Arms")
-            # Dropdown of members to assign
+            pos = st.text_input("New Position e.g. Sergeant at Arms")
             member_names = [m["FullName"] for m in st.session_state.members]
             assign_name = st.selectbox("Assign to Member", member_names)
-            # Auto-fill phone/email from member
             selected_member = next((m for m in st.session_state.members if m["FullName"] == assign_name), None)
             ph = st.text_input("Phone", value=selected_member["Phone"] if selected_member else "")
             em = st.text_input("Email", value=selected_member["Email"] if selected_member else "")
-            if st.form_submit_button("➕ Add Board Position", type="primary"):
+            if st.form_submit_button("Add Position", type="primary"):
                 if pos and assign_name:
-                    # Check if position already exists
-                    exists = any(b["Position"] == pos for b in st.session_state.board)
-                    if not exists:
+                    if not any(b["Position"] == pos for b in st.session_state.board):
                         st.session_state.board.append({"Position":pos,"Name":assign_name,"Phone":ph,"Email":em})
-                        sync_member_role(assign_name, pos)
-                        st.success("Added " + pos + " = " + assign_name + " - Now reflected in " + assign_name + "'s account!")
-                        st.rerun()
-                    else:
-                        st.warning("Position already exists! Use Edit instead.")
-                else:
-                    st.error("Need position and member!")
+                        for m in st.session_state.members:
+                            if m["FullName"] == assign_name:
+                                m["Role"] = pos
+                                break
+                        st.success("Added " + pos + " = " + assign_name); st.rerun()
+                    else: st.warning("Position exists!")
 
-        st.divider()
-        st.subheader("🗑️ Remove Board Position")
-        pos_to_remove = st.selectbox("Select Position to Remove", [b["Position"] for b in st.session_state.board], key="rem")
-        if st.button("Remove Position"):
-            st.session_state.board = [b for b in st.session_state.board if b["Position"]!= pos_to_remove]
-            st.warning("Removed " + pos_to_remove); st.rerun()
+elif menu == "✅ Attendance":
+    show_header("✅","Smart Attendance","Upload Excel - Auto matches")
+    uploaded = st.file_uploader("Upload Attendance", type=["xlsx","csv"])
+    if uploaded:
+        att_df = pd.read_csv(uploaded) if uploaded.name.endswith(".csv") else pd.read_excel(uploaded)
+        st.dataframe(att_df.head(), use_container_width=True)
+        present = []
+        for _, row in att_df.iterrows():
+            name_str = str(row.iloc[0]).lower()
+            for mem in st.session_state.members:
+                if mem["FirstName"].lower() in name_str or mem["LastName"].lower() in name_str:
+                    present.append(mem["FullName"]); break
+        present = list(set(present))
+        c1,c2 = st.columns(2); c1.metric("Present", str(len(present)) + "/" + str(len(st.session_state.members))); c2.metric("Absent", len(st.session_state.members)-len(present))
+        st.write(present)
+
+elif menu == "💰 Finances":
+    show_header("💰","Finances & Dues","Track payments")
+    rows = [{"FullName": m["FullName"], "Phone": m["Phone"], "Dues Paid": 0, "Balance": 50000} for m in st.session_state.members]
+    fin_df = pd.DataFrame(rows)
+    if is_admin():
+        st.data_editor(fin_df, use_container_width=True, height=500)
     else:
-        st.info("🔒 View Only - Only President, Secretary, Treasurer can add/edit Board. Your role: " + str(st.session_state.user_role))
+        st.dataframe(fin_df, use_container_width=True, height=500)
 
 elif menu == "📁 Club Records":
-    show_header("Club Records", "Admin Only Upload")
+    show_header("📁","Club Records Vault","Upload & Download")
     if is_admin():
-        with st.form("record_form"):
-            title = st.text_input("Title"); category = st.selectbox("Category", ["Meeting Minutes","Constitution","Board Resolution","Other"]); f = st.file_uploader("File", type=["pdf","docx","xlsx","csv"])
-            if st.form_submit_button("Upload (Admin Only)", type="primary"):
+        with st.form("record_form", clear_on_submit=True):
+            title = st.text_input("Record Title*"); category = st.selectbox("Category", ["Meeting Minutes","Constitution","Other"]); f = st.file_uploader("Upload File*", type=["pdf","docx","xlsx","csv"])
+            if st.form_submit_button("Upload Record", type="primary", use_container_width=True):
                 if title and f:
                     st.session_state.records.append({"title":title,"category":category,"filename":f.name,"date":datetime.now().strftime("%Y-%m-%d %H:%M"),"by":str(st.session_state.current_user),"data":f.getvalue()}); st.success("Uploaded"); st.rerun()
     for idx, rec in enumerate(reversed(st.session_state.records)):
         with st.expander("📄 " + rec["title"] + " - " + rec["category"]):
-            st.write("File: " + rec["filename"] + " | By: " + rec["by"]); st.download_button("Download", rec["data"], rec["filename"], key="rec"+str(idx), use_container_width=True)
+            st.write("File: " + rec["filename"] + " | By: " + rec["by"])
+            st.download_button("Download", rec["data"], rec["filename"], key="rec"+str(idx), use_container_width=True)
 
 elif menu == "📊 Reports":
-    show_header("Reports", "Admin Only Upload")
+    show_header("📊","Reports Center","Upload & Download")
     if is_admin():
-        with st.form("rep_form"):
-            rtitle = st.text_input("Title"); rtype = st.selectbox("Type", ["Monthly","Financial","Project","Attendance"]); rdesc = st.text_area("Summary"); rfile = st.file_uploader("File", type=["pdf","docx","xlsx"])
-            if st.form_submit_button("Upload (Admin Only)", type="primary"):
+        with st.form("rep_form", clear_on_submit=True):
+            rtitle = st.text_input("Title*"); rtype = st.selectbox("Type", ["Monthly","Financial","Project"]); rdesc = st.text_area("Summary"); rfile = st.file_uploader("Upload File*", type=["pdf","docx","xlsx"])
+            if st.form_submit_button("Upload Report", type="primary", use_container_width=True):
                 if rtitle and rfile:
                     st.session_state.reports.append({"title":rtitle,"type":rtype,"desc":rdesc,"filename":rfile.name,"date":datetime.now().strftime("%Y-%m-%d"),"by":str(st.session_state.current_user),"data":rfile.getvalue()}); st.success("Uploaded"); st.rerun()
     for idx, rep in enumerate(reversed(st.session_state.reports)):
         st.markdown('<div class="pro-card"><b>📊 ' + rep["title"] + '</b> - ' + rep["type"] + '<br>' + rep["desc"] + '</div>', unsafe_allow_html=True)
-        st.download_button("Download", rep["data"], rep["filename"], key="rep"+str(idx))
+        st.download_button("Download", rep["data"], rep["filename"], key="rep"+str(idx), use_container_width=True)
 
-elif menu == "📸 Gallery & Albums":
-    show_header("Gallery", "Admin Only Upload")
+elif menu == "📸 Gallery":
+    show_header("📸","Photo Gallery","Fellowship, Projects, Events")
     if is_admin():
-        with st.form("gal_form"):
-            album = st.selectbox("Album", ["Fellowship","Projects","Community Service","Fundraising","Board Meeting","Other"]); caption = st.text_input("Caption"); photos = st.file_uploader("Photos", type=["jpg","jpeg","png"], accept_multiple_files=True)
-            if st.form_submit_button("Upload (Admin Only)", type="primary"):
+        with st.form("gal_form", clear_on_submit=True):
+            album = st.selectbox("Album", ["Fellowship","Projects","Community Service","Fundraising","Board Meeting","Other"]); caption = st.text_input("Caption"); photos = st.file_uploader("Upload Photos*", type=["jpg","jpeg","png"], accept_multiple_files=True)
+            if st.form_submit_button("Upload Photos", type="primary", use_container_width=True):
                 if photos:
                     for p in photos: st.session_state.gallery.append({"album":album,"caption":caption,"filename":p.name,"date":datetime.now().strftime("%Y-%m-%d"),"data":p.getvalue()})
                     st.success(str(len(photos)) + " uploaded"); st.rerun()
+    filter_album = st.selectbox("Filter by Album", ["All","Fellowship","Projects","Community Service","Fundraising","Board Meeting","Other"])
+    filtered = st.session_state.gallery if filter_album == "All" else [g for g in st.session_state.gallery if g["album"] == filter_album]
     cols = st.columns(3)
-    for idx, item in enumerate(reversed(st.session_state.gallery)):
+    for idx, item in enumerate(reversed(filtered)):
         with cols[idx % 3]:
             st.image(item["data"], caption=item["album"] + " - " + item["caption"], use_container_width=True)
-            st.download_button("Download", item["data"], item["filename"], key="gal"+str(idx))
+            st.download_button("Download", item["data"], item["filename"], key="gal"+str(idx), use_container_width=True)
 
 elif menu == "📢 Club Hub":
-    show_header("Club Hub - Center of Everything", "Official Info")
+    show_header("📢","Club Info Hub","Center of Everything")
     if is_admin():
-        with st.form("ann_form"):
-            atitle = st.text_input("Announcement Title"); amsg = st.text_area("Message")
-            if st.form_submit_button("Post to All Members (Admin Only)", type="primary"):
+        with st.form("ann_form", clear_on_submit=True):
+            atitle = st.text_input("Title*"); amsg = st.text_area("Message*")
+            if st.form_submit_button("Post Announcement", type="primary", use_container_width=True):
                 if atitle and amsg:
                     st.session_state.announcements.append({"title":atitle,"msg":amsg,"date":datetime.now().strftime("%Y-%m-%d %H:%M"),"by":str(st.session_state.current_user)}); st.success("Posted!"); st.rerun()
     for ann in reversed(st.session_state.announcements):
-        st.markdown('<div class="announcement-card"><b>📌 ' + ann["title"] + '</b><br>' + ann["msg"] + '<br><small>📅 ' + ann["date"] + ' | By ' + ann["by"] + '</small></div>', unsafe_allow_html=True)
+        st.markdown('<div class="pro-card"><b>📌 ' + ann["title"] + '</b><br>' + ann["msg"] + '<br><small>' + ann["date"] + ' | By ' + ann["by"] + '</small></div>', unsafe_allow_html=True)
 
-elif menu == "📲 Get APK":
-    show_header("Share APK - Self Registration + Self Reset", "All members install and manage own password!")
-    st.success("Live: https://fmwfp.streamlit.app")
+elif menu == "🧾 Receipts":
+    show_header("🧾","Receipts","Generate receipts")
+    names = [m["FullName"] for m in st.session_state.members]
+    member = st.selectbox("Member", names)
+    amt = st.number_input("Amount UGX", value=50000, step=1000)
+    purp = st.selectbox("Purpose", ["Membership Dues","Donation","Fellowship Fee","Other"])
+    if st.button("Generate Receipt", type="primary", use_container_width=True):
+        rec_no = "RCKH-" + datetime.now().strftime("%Y%m%d%H%M%S")
+        st.success("Receipt Generated!")
+        st.code("Receipt No: " + rec_no + "\nMember: " + member + "\nAmount: UGX " + str(amt) + "\nPurpose: " + purp + "\nDate: " + datetime.now().strftime("%Y-%m-%d %H:%M") + "\nIssued by: " + str(st.session_state.current_user))
+
+elif menu == "📲 Get APK with Logo":
+    show_header("📲","Get APK with Club Logo & Welcome Screen","Logo icon + Welcome to Kyaggwe Heritage")
+    st.success("Live URL: https://fmwfp.streamlit.app")
     st.markdown("""
     <div class="pro-card">
-    <h3>✅ Admin Powers (Only President/Secretary/Treasurer):</h3>
-    - Upload/Edit Records, Reports, Gallery<br>
-    - Add/Remove Members<br>
-    - Add NEW Board Positions anytime (e.g. Sergeant at Arms) - Member account updates instantly!<br>
-    - Edit Board Officers<br>
-    - Post Announcements<br><br>
-    <h3>👥 Member Powers (View Only):</h3>
-    - View everything, download files, see gallery<br>
-    - Cannot upload/edit - Protected!<br>
-    - Can reset own password via Forgot tab - No admin call!<br>
-    - Board position automatically shows in Dashboard when admin assigns them<br><br>
-    <h3>➕ How to Add New Board Officer Later:</h3>
-    1. Login as Admin -> Board Officers page<br>
-    2. Scroll to 'Add NEW Board Position'<br>
-    3. Enter Position Title e.g. Sergeant at Arms<br>
-    4. Select Member from list<br>
-    5. Save -> That member's Role updates everywhere instantly!
+    <h3>🎯 How to Make APK with Club Logo Icon + Welcome Screen</h3>
+    <b>STEP 1 - Make Square Logo 512x512 PNG:</b><br>
+    - Crop your logo_exact_final.png.jpg to square 512x512 using picsart or remove.bg<br>
+    - Save as rotary_512.png<br><br>
+    <b>STEP 2 - Build APK with Logo (PWABuilder - Best):</b><br>
+    1. Go to www.pwabuilder.com<br>
+    2. Enter https://fmwfp.streamlit.app -> Start -> Build My PWA<br>
+    3. Select Android -> Upload your 512x512 logo as icon<br>
+    4. Set Splash Text: Welcome to Kyaggwe Heritage<br>
+    5. Download APK -> Icon will be your club logo!<br><br>
+    <b>STEP 3 - Quick Method (100% Works Now):</b><br>
+    1. Open Chrome -> https://fmwfp.streamlit.app<br>
+    2. Tap 3 dots ⋮ -> Add to Home screen -> Install<br>
+    3. Icon = Club logo, Tap it -> You see Welcome to Kyaggwe Heritage banner (V10 has it!)<br>
     </div>
     """, unsafe_allow_html=True)
-    st.link_button("Open App Link to Share", "https://fmwfp.streamlit.app", use_container_width=True)
-else:
-    show_header(menu, "Coming soon")
+    if logo_path:
+        st.image(logo_path, width=200, caption="Your logo - will be APK icon")
+    st.link_button("Open App Link", "https://fmwfp.streamlit.app", use_container_width=True)
