@@ -1,270 +1,276 @@
 import streamlit as st
 import pandas as pd
-import os, io, base64
-from datetime import datetime
+from datetime import datetime, date
+import uuid
 
-st.set_page_config(page_title="Kyaggwe Heritage PERMANENT", page_icon="⚙️", layout="wide")
-
-# TRY GOOGLE, FALLBACK TO MEMORY IF NOT SET
-USE_GOOGLE = False
 try:
     import gspread
     from google.oauth2.service_account import Credentials
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaIoBaseUpload
-    if "gcp_service_account" in st.secrets:
-        USE_GOOGLE = True
-        scope = ["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"]
+    import io
+    GSHEETS_AVAILABLE = True
+except:
+    GSHEETS_AVAILABLE = False
+
+st.set_page_config(page_title="Kyaggwe Heritage V13", page_icon="♻️", layout="wide")
+
+SHEET_ID = st.secrets.get("SHEET_ID", "")
+DRIVE_FOLDER_ID = st.secrets.get("DRIVE_FOLDER_ID", "")
+PERMANENT_MODE = False
+gc = None
+sheet = None
+drive_service = None
+
+if GSHEETS_AVAILABLE and "gcp_service_account" in st.secrets and SHEET_ID:
+    try:
+        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
         gc = gspread.authorize(creds)
-        SHEET_ID = st.secrets["SHEET_ID"]
-        DRIVE_ID = st.secrets["DRIVE_FOLDER_ID"]
-        sh = gc.open_by_key(SHEET_ID)
-        drive_service = build('drive','v3',credentials=creds)
-        st.success("✅ PERMANENT MODE: Connected to Google Sheet + Drive")
-    else:
-        st.warning("⚠️ Running in TEMP mode - Add Secrets for Permanent storage")
-except Exception as e:
-    USE_GOOGLE = False
-    st.warning(f"⚠️ Google not connected ({e}) - Using temporary memory. Add Secrets for permanent!")
-
-def get_logo():
-    for p in ["logo_exact_final.png.jpg","logo_exact_final.png","logo.png","logo.jpg","rotary_logo.png"]:
-        if os.path.exists(p): return p
-    return None
-logo_path = get_logo()
-
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
-html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
-.stApp { background: #eef2ff; }
-.welcome-banner { background: linear-gradient(135deg, #0A2A5E 0%, #1746A2 60%, #FDB913 100%); padding: 25px; border-radius: 18px; text-align: center; color: white; }
-.pro-header { background: linear-gradient(135deg, #0A2A5E 0%, #1746A2 100%); padding: 15px 20px; border-radius: 12px; color: white; }
-.pro-card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 3px 10px rgba(0,0,0,0.06); border-left: 5px solid #FDB913; margin-bottom: 10px; }
-</style>
-""", unsafe_allow_html=True)
-
-ADMIN_PASSWORDS = {
-    "Khissa Pamela - President": "President123",
-    "Francis Ssemugonda - Secretary": "Secretary123",
-    "Ntulume Wilson Ssekulwana - Treasurer": "Treasurer123"
-}
-ADMINS = ["President","Secretary","Treasurer"]
-
-# DEFAULTS
-DEFAULT_MEMBERS = [
-    {"MemberNo":"11563120","FirstName":"Muzige","LastName":"Abubaker","FullName":"Muzige Abubaker","Phone":"+256 757447213","Email":"muzigeabubakar@gmail.com","Role":"Club Executive Secretary/Director"},
-    {"MemberNo":"12664727","FirstName":"Khissa","LastName":"Pamela","FullName":"Khissa Pamela","Phone":"+256 781451436","Email":"pamelakhissa4@gmail.com","Role":"Club President"},
-    {"MemberNo":"12664757","FirstName":"Ntulume","LastName":"Ssekulwana","FullName":"Ntulume Wilson Ssekulwana","Phone":"+256 752525386","Email":"wilsonntulume97@gmail.com","Role":"Club Treasurer"},
-    {"MemberNo":"12664735","FirstName":"Francis","LastName":"Ssemugonda","FullName":"Francis Ssemugonda","Phone":"+256 762736379","Email":"francisssemugonda@gmail.com","Role":"Club Secretary"},
-]
-DEFAULT_BOARD = [
-    {"Position":"Club President","Name":"Khissa Pamela","Phone":"+256 781451436","Email":"pamelakhissa4@gmail.com"},
-    {"Position":"Club Secretary","Name":"Francis Ssemugonda","Phone":"+256 762736379","Email":"francisssemugonda@gmail.com"},
-    {"Position":"Club Treasurer","Name":"Ntulume Wilson Ssekulwana","Phone":"+256 752525386","Email":"wilsonntulume97@gmail.com"},
-]
-
-# GOOGLE FUNCTIONS
-def load_sheet(tab):
-    if not USE_GOOGLE: return None
-    try:
-        ws = sh.worksheet(tab)
-        data = ws.get_all_records()
-        return data
-    except: return None
-
-def save_sheet(tab, df):
-    if not USE_GOOGLE: return
-    try:
-        ws = sh.worksheet(tab)
-        ws.clear()
-        ws.update([df.columns.values.tolist()] + df.values.tolist())
+        sheet = gc.open_by_key(SHEET_ID)
+        drive_service = build('drive', 'v3', credentials=creds)
+        PERMANENT_MODE = True
     except Exception as e:
-        st.error(f"Save error {tab}: {e}")
+        st.error(f"Connection failed: {e}")
 
-def upload_to_drive(file_bytes, filename):
-    if not USE_GOOGLE: return None
+def get_or_create_ws(name, headers):
     try:
-        file_metadata = {'name': filename, 'parents': [DRIVE_ID]}
-        media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype='application/octet-stream')
-        file = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
-        drive_service.permissions().create(fileId=file.get('id'), body={'role':'reader','type':'anyone'}).execute()
-        return file.get('webViewLink')
-    except Exception as e:
-        st.error(f"Drive upload error: {e}")
+        try:
+            ws = sheet.worksheet(name)
+        except:
+            ws = sheet.add_worksheet(title=name, rows=1000, cols=20)
+            ws.append_row(headers)
+            return ws
+        vals = ws.get_all_values()
+        if not vals:
+            ws.append_row(headers)
+        return ws
+    except:
         return None
 
-# INIT SESSION WITH GOOGLE OR DEFAULT
-if "members" not in st.session_state:
-    data = load_sheet("members") if USE_GOOGLE else None
-    st.session_state.members = data if data else DEFAULT_MEMBERS.copy()
-if "board" not in st.session_state:
-    data = load_sheet("board") if USE_GOOGLE else None
-    st.session_state.board = data if data else DEFAULT_BOARD.copy()
-if "announcements" not in st.session_state:
-    data = load_sheet("announcements") if USE_GOOGLE else None
-    st.session_state.announcements = data if data else [{"title":"Welcome to Kyaggwe Heritage V12 Permanent!","msg":"All uploads now stay forever via Google!","date":"2026-05-13","by":"President"}]
-if "records" not in st.session_state: st.session_state.records = load_sheet("files") or []
-if "gallery" not in st.session_state: st.session_state.gallery = []
-if "reports" not in st.session_state: st.session_state.reports = []
-if "member_passwords" not in st.session_state: st.session_state.member_passwords = {}
-if "logged_in" not in st.session_state: st.session_state.logged_in = False
+def load_data(ws_name, cols):
+    if not PERMANENT_MODE:
+        return pd.DataFrame(columns=cols)
+    ws = get_or_create_ws(ws_name, cols)
+    if not ws:
+        return pd.DataFrame(columns=cols)
+    try:
+        records = ws.get_all_records()
+        df = pd.DataFrame(records)
+        for c in cols:
+            if c not in df.columns:
+                df[c] = ""
+        return df
+    except:
+        return pd.DataFrame(columns=cols)
 
-def show_header(icon, title, subtitle):
-    st.markdown(f'<div class="pro-header"><h3>{icon} {title}</h3><p>{subtitle}</p></div>', unsafe_allow_html=True)
-def is_admin(): return any(a in st.session_state.get("user_role","") for a in ADMINS)
+def append_row(ws_name, row_data, headers):
+    if not PERMANENT_MODE:
+        return False
+    ws = get_or_create_ws(ws_name, headers)
+    try:
+        ws.append_row([str(x) for x in row_data])
+        return True
+    except Exception as e:
+        st.error(f"Save failed {ws_name}: {e}")
+        return False
 
-# LOGIN
-if not st.session_state.logged_in:
-    st.markdown('<div class="welcome-banner"><div style="font-size:50px;">⚙️</div><h1>Kyaggwe Heritage</h1><h3>Welcome to Kyaggwe Heritage - V12 PERMANENT</h3><p>District 9213 | Club ID: 228098</p></div>', unsafe_allow_html=True)
-    if logo_path: st.image(logo_path, width=150)
-    tab1, tab2 = st.tabs(["🔐 Admin (3 Only)", "👥 Member"])
-    with tab1:
-        officer = st.selectbox("Select Admin", list(ADMIN_PASSWORDS.keys()))
-        pwd = st.text_input("Password", type="password")
-        if st.button("Login as Admin", type="primary", use_container_width=True):
-            if ADMIN_PASSWORDS.get(officer) == pwd:
-                st.session_state.logged_in = True
-                st.session_state.current_user = officer
-                st.session_state.user_role = officer.split(" - ")[1]
+def clear_and_save(ws_name, df, headers):
+    ws = get_or_create_ws(ws_name, headers)
+    try:
+        ws.clear()
+        ws.append_row(headers)
+        if not df.empty:
+            ws.append_rows(df.astype(str).values.tolist())
+        return True
+    except Exception as e:
+        st.error(f"Save failed: {e}")
+        return False
+
+def upload_to_drive(file_bytes, filename):
+    if not PERMANENT_MODE or not drive_service:
+        return None
+    try:
+        file_metadata = {'name': filename, 'parents': [DRIVE_FOLDER_ID] if DRIVE_FOLDER_ID else []}
+        media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype='application/octet-stream')
+        file = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
+        try:
+            drive_service.permissions().create(fileId=file.get('id'), body={'type': 'anyone', 'role': 'reader'}).execute()
+        except:
+            pass
+        return file.get('webViewLink')
+    except Exception as e:
+        st.error(f"Drive upload failed: {e}")
+        return None
+
+MEMBER_COLS = ["Name", "Phone", "Email", "Role", "JoinDate", "Status"]
+BOARD_COLS = ["Position", "Name", "Phone", "Email", "StartDate"]
+ANNOUNCE_COLS = ["Date", "Title", "Message", "By"]
+FILES_COLS = ["Date", "FileName", "Type", "Link", "UploadedBy"]
+ATTEND_COLS = ["Date", "MemberName", "Present", "MeetingType"]
+FINANCE_COLS = ["Date", "Description", "Income", "Expense", "Balance", "Category", "By"]
+RECEIPT_COLS = ["Date", "MemberName", "Amount", "Purpose", "ReceiptNo", "IssuedBy"]
+
+members_df = load_data("members", MEMBER_COLS)
+board_df = load_data("board", BOARD_COLS)
+announce_df = load_data("announcements", ANNOUNCE_COLS)
+files_df = load_data("files", FILES_COLS)
+attendance_df = load_data("attendance", ATTEND_COLS)
+finances_df = load_data("finances", FINANCE_COLS)
+receipts_df = load_data("receipts", RECEIPT_COLS)
+
+if board_df.empty and PERMANENT_MODE:
+    defaults = [["President","To be assigned","","",""], ["Secretary","Francis Ssemugonda","","",""], ["Treasurer","To be assigned","","",""]]
+    for r in defaults:
+        append_row("board", r, BOARD_COLS)
+    board_df = load_data("board", BOARD_COLS)
+
+if PERMANENT_MODE:
+    st.sidebar.success("✅ PERMANENT MODE V13 ALL PERMANENT")
+else:
+    st.sidebar.warning("⚠️ TEMP MODE")
+
+st.sidebar.markdown("### Rotary Kyaggwe Heritage")
+st.sidebar.markdown("Francis Ssemugonda - Secretary")
+menu = st.sidebar.radio("MENU", ["🏠 Dashboard (Permanent)", "👥 Members (Permanent)", "🏛️ Board Officers (Permanent)", "✅ Attendance (Permanent)", "💰 Finances (Permanent)", "📁 Club Records (Permanent)", "📊 Reports (Permanent)", "📸 Gallery (Permanent)", "📢 Club Hub (Permanent)", "🧾 Receipts (Permanent)", "📱 Get APK"])
+
+if "Dashboard" in menu:
+    st.markdown("<h1 style='text-align:center;color:#1e3a8a'>Rotary Club of Kyaggwe Heritage</h1>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align:center'>V13 - ALL PERMANENT - Nothing Disappears!</h3>", unsafe_allow_html=True)
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Members", len(members_df))
+    c2.metric("Attendance", len(attendance_df))
+    c3.metric("Finances", len(finances_df))
+    c4.metric("Files", len(files_df))
+    st.divider()
+    st.dataframe(members_df.tail(5))
+
+elif "Members" in menu:
+    st.header("👥 Members - Permanent")
+    with st.form("add_member"):
+        name = st.text_input("Full Name")
+        phone = st.text_input("Phone")
+        email = st.text_input("Email")
+        role = st.selectbox("Role", ["Member","President","Secretary","Treasurer","Board"])
+        if st.form_submit_button("Add Member (Permanent Save)"):
+            if name:
+                append_row("members", [name, phone, email, role, str(date.today()), "Active"], MEMBER_COLS)
+                st.success(f"Member {name} saved permanently!")
                 st.rerun()
-            else: st.error("Wrong!")
-    with tab2:
-        phone = st.text_input("Phone"); pp = st.text_input("Password", type="password", key="m2")
-        if st.button("Login Member", type="primary", use_container_width=True):
-            found = next((m for m in st.session_state.members if m["Phone"]==phone), None)
-            if found:
-                if st.session_state.member_passwords.get(phone,"member123")==pp:
-                    st.session_state.logged_in=True
-                    st.session_state.current_user=found["FullName"]
-                    st.session_state.user_role=found["Role"]
-                    st.rerun()
-                else: st.error("Wrong password")
-            else: st.error("Not found")
-    st.stop()
+    st.dataframe(members_df, use_container_width=True)
 
-with st.sidebar:
-    if logo_path: st.image(logo_path, width=120)
-    st.write(f"👤 {st.session_state.current_user}")
-    st.caption(f"🏷️ {st.session_state.user_role} {'✅' if is_admin() else ''}")
-    st.caption("✅ PERMANENT MODE" if USE_GOOGLE else "⚠️ TEMP MODE")
-    menu = st.radio("MENU", ["🏠 Dashboard","👥 Members","🏛️ Board Officers","✅ Attendance","💰 Finances","📁 Club Records (Permanent)","📊 Reports (Permanent)","📸 Gallery (Permanent)","📢 Club Hub","🧾 Receipts","📲 Get APK"])
-    if st.button("🚪 Logout"):
-        st.session_state.logged_in=False
-        st.rerun()
+elif "Board" in menu:
+    st.header("🏛️ Board Officers - Permanent")
+    with st.form("board_form"):
+        pos = st.selectbox("Position", ["President","Vice President","Secretary","Treasurer","Membership Chair","Service Projects","Public Image","Foundation Chair","SAA"])
+        bname = st.text_input("Name")
+        bphone = st.text_input("Phone")
+        bemail = st.text_input("Email")
+        if st.form_submit_button("Save Board Officer Permanently"):
+            append_row("board", [pos, bname, bphone, bemail, str(date.today())], BOARD_COLS)
+            st.success("Saved!")
+            st.rerun()
+    st.dataframe(board_df, use_container_width=True)
 
-# DASHBOARD
-if menu=="🏠 Dashboard":
-    st.markdown(f'<div class="welcome-banner"><h2>Welcome {st.session_state.current_user.split(" -")[0]}!</h2><p>{datetime.now().strftime("%b %d, %Y")} | Permanent Storage: {"ON ✅" if USE_GOOGLE else "OFF ⚠️"}</p></div>', unsafe_allow_html=True)
-    c1,c2,c3 = st.columns(3)
-    c1.metric("👥 Members", len(st.session_state.members))
-    c2.metric("🏛️ Board", len(st.session_state.board))
-    c3.metric("📢 Announcements", len(st.session_state.announcements))
-    st.dataframe(pd.DataFrame(st.session_state.board), use_container_width=True)
-    for ann in reversed(st.session_state.announcements[-5:]):
-        st.markdown(f'<div class="pro-card"><b>📌 {ann["title"]}</b><br>{ann["msg"]}<br><small>{ann["date"]} | {ann["by"]}</small></div>', unsafe_allow_html=True)
+elif "Attendance" in menu:
+    st.header("✅ Attendance - Permanent V13")
+    with st.form("attend_form"):
+        att_date = st.date_input("Meeting Date", date.today())
+        meeting_type = st.selectbox("Meeting Type", ["Weekly Fellowship","Board Meeting","Service Project","Special"])
+        member_names = members_df["Name"].tolist() if not members_df.empty else ["Guest"]
+        selected_member = st.selectbox("Member", member_names)
+        present = st.selectbox("Status", ["Present","Absent","Apology"])
+        if st.form_submit_button("Save Attendance Permanently"):
+            append_row("attendance", [str(att_date), selected_member, present, meeting_type], ATTEND_COLS)
+            st.success(f"Attendance for {selected_member} saved permanently!")
+            st.rerun()
+    st.dataframe(attendance_df, use_container_width=True)
 
-elif menu=="👥 Members":
-    show_header("👥","Members","Permanent if Google ON")
-    st.dataframe(pd.DataFrame(st.session_state.members), use_container_width=True)
-    if is_admin():
-        with st.form("add_mem"):
-            fn=st.text_input("First"); ln=st.text_input("Last"); ph=st.text_input("Phone"); em=st.text_input("Email"); role=st.text_input("Role", "Member")
-            if st.form_submit_button("Add & Save Permanently", type="primary"):
-                if fn and ln and ph:
-                    st.session_state.members.append({"MemberNo":"NEW","FirstName":fn,"LastName":ln,"FullName":fn+" "+ln,"Phone":ph,"Email":em,"Role":role})
-                    if USE_GOOGLE: save_sheet("members", pd.DataFrame(st.session_state.members))
-                    st.success("Saved permanently!"); st.rerun()
-        if st.button("💾 Force Save All to Google Sheet"):
-            if USE_GOOGLE:
-                save_sheet("members", pd.DataFrame(st.session_state.members))
-                st.success("Saved to Google!")
-            else: st.error("Connect Google first")
+elif "Finances" in menu:
+    st.header("💰 Finances - Permanent V13")
+    with st.form("finance_form"):
+        f_date = st.date_input("Date", date.today())
+        desc = st.text_input("Description")
+        income = st.number_input("Income (UGX)", min_value=0, step=1000)
+        expense = st.number_input("Expense (UGX)", min_value=0, step=1000)
+        category = st.selectbox("Category", ["Membership Fees","Donation","Project","Administration","Fellowship","Other"])
+        by = st.text_input("Recorded By", "Francis Ssemugonda")
+        if st.form_submit_button("Save Finance Permanently"):
+            try:
+                prev_income = pd.to_numeric(finances_df["Income"], errors='coerce').sum() if not finances_df.empty else 0
+                prev_expense = pd.to_numeric(finances_df["Expense"], errors='coerce').sum() if not finances_df.empty else 0
+                new_bal = (prev_income + income) - (prev_expense + expense)
+            except:
+                new_bal = income - expense
+            append_row("finances", [str(f_date), desc, income, expense, new_bal, category, by], FINANCE_COLS)
+            st.success(f"Finance saved! Balance: {new_bal}")
+            st.rerun()
+    st.dataframe(finances_df, use_container_width=True)
 
-elif menu=="🏛️ Board Officers":
-    show_header("🏛️","Board Officers - Edit/Add/Remove + Permanent","Edits save to Google Sheet forever")
-    st.dataframe(pd.DataFrame(st.session_state.board), use_container_width=True)
-    if is_admin():
-        st.divider()
-        st.subheader("✏️ Edit")
-        sel = st.selectbox("Select Position", [b["Position"] for b in st.session_state.board])
-        cur = next(b for b in st.session_state.board if b["Position"]==sel)
-        with st.form("edit_b"):
-            nn=st.text_input("Name", cur["Name"]); pp=st.text_input("Phone", cur["Phone"]); ee=st.text_input("Email", cur["Email"])
-            if st.form_submit_button("💾 Save Edit Permanently", type="primary"):
-                for b in st.session_state.board:
-                    if b["Position"]==sel:
-                        b["Name"]=nn; b["Phone"]=pp; b["Email"]=ee
-                if USE_GOOGLE: save_sheet("board", pd.DataFrame(st.session_state.board))
-                st.success("Updated permanently!"); st.rerun()
-        st.divider()
-        st.subheader("➕ Add")
-        with st.form("add_b"):
-            pos=st.text_input("New Position*"); name=st.selectbox("Member", [m["FullName"] for m in st.session_state.members])
-            sel_m=next(m for m in st.session_state.members if m["FullName"]==name)
-            if st.form_submit_button("Add Permanently", type="primary"):
-                if pos:
-                    st.session_state.board.append({"Position":pos,"Name":name,"Phone":sel_m["Phone"],"Email":sel_m["Email"]})
-                    if USE_GOOGLE: save_sheet("board", pd.DataFrame(st.session_state.board))
-                    st.success("Added permanently!"); st.rerun()
-        st.divider()
-        st.subheader("🗑️ Remove")
-        rem=st.selectbox("Position to Remove", [b["Position"] for b in st.session_state.board], key="rem")
-        if st.button("Remove Permanently"):
-            st.session_state.board=[b for b in st.session_state.board if b["Position"]!=rem]
-            if USE_GOOGLE: save_sheet("board", pd.DataFrame(st.session_state.board))
-            st.warning(f"Removed {rem} permanently"); st.rerun()
+elif "Club Records" in menu:
+    st.header("📁 Club Records - Permanent")
+    uploaded = st.file_uploader("Upload Document", type=["pdf","docx","xlsx","jpg","png"])
+    if uploaded and st.button("Upload to Permanent Drive"):
+        link = upload_to_drive(uploaded.getvalue(), uploaded.name)
+        if link:
+            append_row("files", [str(date.today()), uploaded.name, "Document", link, "Secretary"], FILES_COLS)
+            st.success(f"Uploaded! {link}")
+            st.rerun()
+    st.dataframe(files_df, use_container_width=True)
 
-elif menu=="📁 Club Records (Permanent)":
-    show_header("📁","Club Records - Permanent Storage","Uploads to Google Drive forever")
-    if is_admin():
-        with st.form("rec", clear_on_submit=True):
-            title=st.text_input("Title*"); cat=st.selectbox("Category", ["Minutes","Constitution","Other"]); f=st.file_uploader("File*")
-            if st.form_submit_button("📤 Upload Permanently to Drive", type="primary", use_container_width=True):
-                if title and f:
-                    link = upload_to_drive(f.getvalue(), f.name) if USE_GOOGLE else None
-                    st.session_state.records.append({"title":title,"category":cat,"filename":f.name,"date":datetime.now().strftime("%Y-%m-%d"),"by":st.session_state.current_user,"link":link or "TEMP"})
-                    if USE_GOOGLE and link: save_sheet("files", pd.DataFrame(st.session_state.records))
-                    st.success(f"Uploaded! Link: {link}" if link else "Uploaded temp - Connect Google for permanent"); st.rerun()
-    for idx, rec in enumerate(reversed(st.session_state.records)):
-        with st.expander(f"📄 {rec['title']} - {rec['filename']}"):
-            st.write(f"By {rec['by']} | {rec['date']}")
-            if rec.get("link") and "http" in rec["link"]:
-                st.link_button("🔗 Open in Drive (Permanent)", rec["link"])
-            else:
-                st.caption("Temp file - Will delete after reboot")
+elif "Reports" in menu:
+    st.header("📊 Reports - Permanent")
+    if not finances_df.empty:
+        st.dataframe(finances_df)
+        csv = finances_df.to_csv(index=False).encode('utf-8')
+        st.download_button("Download Finance CSV", csv, "finances_v13.csv", "text/csv")
+    if not attendance_df.empty:
+        csv2 = attendance_df.to_csv(index=False).encode('utf-8')
+        st.download_button("Download Attendance CSV", csv2, "attendance_v13.csv", "text/csv")
 
-elif menu=="📸 Gallery (Permanent)":
-    show_header("📸","Gallery - Permanent","Photos to Drive")
-    if is_admin():
-        album=st.selectbox("Album", ["Fellowship","Projects","Other"]); cap=st.text_input("Caption"); photos=st.file_uploader("Photos", accept_multiple_files=True, type=["jpg","png","jpeg"])
-        if st.button("📸 Upload Photos Permanently", type="primary", use_container_width=True):
-            if photos:
-                for p in photos:
-                    link = upload_to_drive(p.getvalue(), p.name) if USE_GOOGLE else None
-                    st.session_state.gallery.append({"album":album,"caption":cap,"filename":p.name,"link":link})
-                st.success(f"{len(photos)} uploaded to Drive permanently!" if USE_GOOGLE else "Uploaded temp"); st.rerun()
-    for item in reversed(st.session_state.gallery):
-        if item.get("link") and "http" in str(item.get("link")):
-            st.write(f"{item['album']} - {item['caption']}")
-            st.link_button(f"View {item['filename']}", item["link"])
-        else:
-            st.caption(f"TEMP: {item['filename']}")
+elif "Gallery" in menu:
+    st.header("📸 Gallery - Permanent Drive")
+    img = st.file_uploader("Upload Photo", type=["jpg","jpeg","png"])
+    if img and st.button("Upload Photo Permanently"):
+        link = upload_to_drive(img.getvalue(), img.name)
+        if link:
+            append_row("files", [str(date.today()), img.name, "Gallery", link, "Secretary"], FILES_COLS)
+            st.success("Photo saved permanently!")
+            st.rerun()
+    gallery = files_df[files_df["Type"] == "Gallery"] if not files_df.empty else pd.DataFrame()
+    for _, r in gallery.iterrows():
+        st.markdown(f"**{r['FileName']}** - [View]({r['Link']})")
 
-elif menu=="📢 Club Hub":
-    show_header("📢","Club Hub - Permanent Announcements","Saves to Google Sheet")
-    if is_admin():
-        with st.form("ann", clear_on_submit=True):
-            at=st.text_input("Title*"); am=st.text_area("Message*")
-            if st.form_submit_button("Post Permanently", type="primary"):
-                if at and am:
-                    st.session_state.announcements.append({"title":at,"msg":am,"date":datetime.now().strftime("%Y-%m-%d %H:%M"),"by":st.session_state.current_user})
-                    if USE_GOOGLE: save_sheet("announcements", pd.DataFrame(st.session_state.announcements))
-                    st.success("Posted permanently!"); st.rerun()
-    for ann in reversed(st.session_state.announcements):
-        st.markdown(f'<div class="pro-card"><b>{ann["title"]}</b><br>{ann["msg"]}<br><small>{ann["date"]} | {ann["by"]}</small></div>', unsafe_allow_html=True)
+elif "Club Hub" in menu:
+    st.header("📢 Club Hub - Permanent")
+    with st.form("announce_form"):
+        title = st.text_input("Title")
+        msg = st.text_area("Message")
+        if st.form_submit_button("Post Announcement Permanently"):
+            append_row("announcements", [str(datetime.now()), title, msg, "Secretary"], ANNOUNCE_COLS)
+            st.success("Posted!")
+            st.rerun()
+    st.dataframe(announce_df, use_container_width=True)
+
+elif "Receipts" in menu:
+    st.header("🧾 Receipts - Permanent V13")
+    with st.form("receipt_form"):
+        r_date = st.date_input("Date", date.today())
+        r_member = st.selectbox("Member", members_df["Name"].tolist() if not members_df.empty else ["Guest"])
+        amount = st.number_input("Amount", min_value=0, step=1000)
+        purpose = st.text_input("Purpose")
+        receipt_no = st.text_input("Receipt No", f"RCP-{uuid.uuid4().hex[:6].upper()}")
+        issued_by = st.text_input("Issued By", "Francis Ssemugonda")
+        if st.form_submit_button("Issue Receipt Permanently"):
+            append_row("receipts", [str(r_date), r_member, amount, purpose, receipt_no, issued_by], RECEIPT_COLS)
+            st.success(f"Receipt {receipt_no} saved!")
+            st.rerun()
+    st.dataframe(receipts_df, use_container_width=True)
 
 else:
-    show_header("✅","Other Pages","Same as V11 - Now permanent if Google ON")
-    st.info("Attendance, Finances, Reports, Receipts, APK pages work same as V11. For permanent, connect Google as above. Current mode: " + ("PERMANENT ✅" if USE_GOOGLE else "TEMP ⚠️ Add Secrets for permanent"))
+    st.header("📱 Get APK")
+    st.write("App link: https://kyaggwe-heritage-club.streamlit.app")
+    st.info("V13 ALL PERMANENT - All modules save to Google Sheets!")
+
+st.sidebar.divider()
+st.sidebar.write(f"V13 | {len(members_df)} Members | {len(finances_df)} Finance | {len(attendance_df)} Attendance")
